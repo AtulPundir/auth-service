@@ -1,0 +1,16 @@
+package com.myapp.authservice.domain;
+
+public enum AuditAction {
+    USER_SIGNUP,
+    USER_LOGIN_OTP,
+    USER_LOGIN_PASSKEY,
+    OTP_SENT,
+    OTP_VERIFIED,
+    OTP_FAILED,
+    PASSKEY_SET,
+    PASSKEY_LOGIN_FAILED,
+    TOKEN_REFRESHED,
+    USER_LOGOUT,
+    ACCOUNT_SUSPENDED,
+    ACCOUNT_DELETED
+}

@@ -66,8 +66,8 @@ server:
 app:
   jwt:
     secret: ${JWT_SECRET:your-super-secret-256-bit-key-change-this-in-production}
-    access-token-expiry-seconds: 900 # 15 minutes
-    refresh-token-expiry-days: 7
+    access-token-expiry-seconds: 3600 # 1 hour
+    refresh-token-expiry-days: 30
 
   otp:
     length: 6

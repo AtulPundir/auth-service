@@ -29,12 +29,15 @@ public class AuthController {
             @Valid @RequestBody SendOtpRequest request,
             HttpServletRequest httpRequest) {
 
+        log.info("POST /auth/otp/send - Request: phone={}", maskPhone(request.getPhone()));
+
         String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
 
         OtpSentResponse response = authService.sendOtp(
                 request.getPhone(), ipAddress, userAgent);
 
+        log.info("POST /auth/otp/send - Response: success=true, expiresIn={}", response.getExpiresIn());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -47,6 +50,9 @@ public class AuthController {
             @Valid @RequestBody VerifyOtpRequest request,
             HttpServletRequest httpRequest) {
 
+        log.info("POST /auth/otp/verify - Request: phone={}, otp=****, name={}",
+                maskPhone(request.getPhone()), request.getName());
+
         String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
 
@@ -57,6 +63,7 @@ public class AuthController {
                 ipAddress,
                 userAgent);
 
+        log.info("POST /auth/otp/verify - Response: success=true, userId={}", response.getUser().getId());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -170,6 +177,33 @@ public class AuthController {
     }
 
     /**
+     * Update user profile
+     * PUT /auth/profile
+     */
+    @PutMapping("/profile")
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
+            @RequestBody UpdateProfileRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest httpRequest) {
+
+        log.info("PUT /auth/profile - Request: userId={}, name={}, email={}",
+                user.getUserId(), request.getName(), request.getEmail());
+
+        String ipAddress = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+
+        UserResponse response = authService.updateProfile(
+                user.getUserId(),
+                request.getName(),
+                request.getEmail(),
+                ipAddress,
+                userAgent);
+
+        log.info("PUT /auth/profile - Response: success=true");
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
      * Extract client IP address from request
      */
     private String getClientIp(HttpServletRequest request) {
@@ -182,5 +216,15 @@ public class AuthController {
             return xRealIp;
         }
         return request.getRemoteAddr();
+    }
+
+    /**
+     * Mask phone number for logging (show first 5 and last 2 chars)
+     */
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 8) {
+            return "****";
+        }
+        return phone.substring(0, 5) + "****" + phone.substring(phone.length() - 2);
     }
 }

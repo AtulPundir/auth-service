@@ -108,20 +108,19 @@ public class AuthService {
         boolean isNewUser = existingUser.isEmpty();
 
         if (isNewUser) {
-            if (name == null || name.isBlank()) {
-                throw new BadRequestException("Name is required for new users");
-            }
+            // Use provided name or default to "Guest"
+            String userName = (name != null && !name.isBlank()) ? name : "Guest";
             user = User.builder()
                     .id(CuidGenerator.generate())
                     .phone(formattedPhone)
-                    .name(name)
+                    .name(userName)
                     .role(Role.USER)
                     .status(UserStatus.ACTIVE)
                     .build();
             userRepository.save(user);
 
             createAuditLog(user, AuditAction.USER_SIGNUP, formattedPhone, ipAddress, userAgent,
-                    Map.of("name", name), true);
+                    Map.of("name", userName), true);
             log.info("New user created: {}", user.getId());
         } else {
             user = existingUser.get();
@@ -285,6 +284,46 @@ public class AuthService {
                 .id(user.getId())
                 .phone(user.getPhone())
                 .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+    }
+
+    /**
+     * Update user profile
+     */
+    @Transactional
+    public UserResponse updateProfile(String userId, String name, String email,
+                                       String ipAddress, String userAgent) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Update fields if provided
+        if (name != null && !name.isBlank()) {
+            user.setName(name.trim());
+        }
+        if (email != null && !email.isBlank()) {
+            user.setEmail(email.trim().toLowerCase());
+        }
+
+        userRepository.save(user);
+
+        // Audit log
+        createAuditLog(user, AuditAction.PROFILE_UPDATED, user.getPhone(),
+                ipAddress, userAgent,
+                Map.of("updatedFields", (name != null ? "name," : "") + (email != null ? "email" : "")),
+                true);
+
+        log.info("Profile updated for user: {}", userId);
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .phone(user.getPhone())
+                .name(user.getName())
+                .email(user.getEmail())
                 .role(user.getRole())
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())

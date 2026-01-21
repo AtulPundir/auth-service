@@ -33,6 +33,7 @@ public class UserResponse {
     private String id;
     private String phone;
     private String name;
+    private String email;
     private Role role;
     private UserStatus status;
     private LocalDateTime createdAt;

@@ -37,6 +37,9 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    @Column(length = 100)
+    private String email;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, length = 10)

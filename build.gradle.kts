@@ -45,6 +45,10 @@ dependencies {
     // Redis
     implementation("io.lettuce:lettuce-core")
 
+    // Rate Limiting (Bucket4j)
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
+    implementation("com.bucket4j:bucket4j-redis:8.10.1")
+
     // Password Hashing (BCrypt via Spring Security)
     implementation("org.springframework.security:spring-security-crypto")
 

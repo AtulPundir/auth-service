@@ -41,6 +41,7 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final OtpUtils otpUtils;
     private final PasswordEncoder passwordEncoder;
+    private final RateLimitingService rateLimitingService;
 
     @Value("${app.jwt.refresh-token-expiry-days}")
     private long refreshTokenExpiryDays;
@@ -51,6 +52,10 @@ public class AuthService {
     @Transactional
     public OtpSentResponse sendOtp(String phone, String ipAddress, String userAgent) {
         String formattedPhone = otpUtils.formatPhone(phone);
+
+        // Check rate limit (per phone number)
+        rateLimitingService.checkOtpSendLimit(formattedPhone);
+
         String otp = otpUtils.generateOtp();
         LocalDateTime expiresAt = otpUtils.getExpiryDate();
 
@@ -63,11 +68,12 @@ public class AuthService {
                 .build();
         otpCodeRepository.save(otpCode);
 
-        // Audit log
+        // Audit log (never log the OTP code itself)
         createAuditLog(null, AuditAction.OTP_SENT, formattedPhone, ipAddress, userAgent,
                 Map.of("expiresAt", expiresAt.toString()), true);
 
-        log.info("OTP sent to phone: {}, code: {}", formattedPhone, otp);
+        // Log only masked phone, never the OTP code (security best practice)
+        log.info("OTP sent to phone: {}", maskPhone(formattedPhone));
 
         return OtpSentResponse.builder()
                 .message("OTP sent successfully")
@@ -82,6 +88,9 @@ public class AuthService {
     public AuthResponse verifyOtpAndLogin(String phone, String otp, String name,
                                            String ipAddress, String userAgent) {
         String formattedPhone = otpUtils.formatPhone(phone);
+
+        // Check rate limit (per phone number) before verification
+        rateLimitingService.checkOtpVerifyLimit(formattedPhone);
 
         // Find valid OTP
         Optional<OtpCode> otpCodeOpt = otpCodeRepository.findValidOtp(
@@ -143,6 +152,9 @@ public class AuthService {
         createAuditLog(user, AuditAction.USER_LOGIN_OTP, formattedPhone, ipAddress, userAgent,
                 null, true);
 
+        // Reset rate limit on successful verification
+        rateLimitingService.resetOtpVerifyLimit(formattedPhone);
+
         return authResponse;
     }
 
@@ -153,6 +165,9 @@ public class AuthService {
     public AuthResponse loginWithPasskey(String phone, String passkey,
                                           String ipAddress, String userAgent) {
         String formattedPhone = otpUtils.formatPhone(phone);
+
+        // Check rate limit (per phone number) before passkey verification
+        rateLimitingService.checkPasskeyLoginLimit(formattedPhone);
 
         User user = userRepository.findByPhone(formattedPhone)
                 .orElseThrow(() -> new NotFoundException("User not found"));
@@ -180,6 +195,9 @@ public class AuthService {
         // Audit log
         createAuditLog(user, AuditAction.USER_LOGIN_PASSKEY, formattedPhone,
                 ipAddress, userAgent, null, true);
+
+        // Reset rate limit on successful login
+        rateLimitingService.resetPasskeyLoginLimit(formattedPhone);
 
         return authResponse;
     }
@@ -387,5 +405,20 @@ public class AuthService {
                 .success(success)
                 .build();
         auditLogRepository.save(auditLog);
+    }
+
+    /**
+     * Mask phone number for logging (security best practice)
+     * Example: +919876543210 -> +91****3210
+     */
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 8) {
+            return "****";
+        }
+        // Keep country code and last 4 digits
+        int len = phone.length();
+        String prefix = phone.substring(0, Math.min(3, len));
+        String suffix = phone.substring(len - 4);
+        return prefix + "****" + suffix;
     }
 }

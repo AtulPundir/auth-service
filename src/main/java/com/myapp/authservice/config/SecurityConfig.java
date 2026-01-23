@@ -37,11 +37,21 @@ public class SecurityConfig {
     @Value("${app.security.bcrypt.strength}")
     private int bcryptStrength;
 
+    @Value("${app.security.cors.enabled:true}")
+    private boolean corsEnabled;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // Conditionally enable CORS (disable when behind reverse proxy like Nginx)
+                .cors(cors -> {
+                    if (corsEnabled) {
+                        cors.configurationSource(corsConfigurationSource());
+                    } else {
+                        cors.disable();
+                    }
+                })
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth

@@ -61,6 +61,8 @@ server:
     context-path: /
   compression:
     enabled: true
+  # Trust X-Forwarded-* headers when behind reverse proxy
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:NONE}
 
 # Application Configuration
 app:
@@ -76,6 +78,7 @@ app:
 
   security:
     cors:
+      enabled: ${CORS_ENABLED:true}
       allowed-origins: ${CORS_ORIGINS:*}
       allowed-methods: GET,POST,PUT,DELETE,OPTIONS
       allowed-headers: "*"

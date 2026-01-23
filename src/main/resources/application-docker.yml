@@ -1,0 +1,28 @@
+# =============================================================================
+# Docker Profile Configuration
+# Used when running behind Nginx reverse proxy in Docker
+# =============================================================================
+
+server:
+  # Trust X-Forwarded-* headers from Nginx
+  forward-headers-strategy: FRAMEWORK
+
+# Application Configuration for Docker
+app:
+  security:
+    cors:
+      # Disable CORS when behind Nginx (Nginx handles CORS if needed)
+      enabled: false
+
+# Logging - reduce verbosity in containers
+logging:
+  level:
+    root: INFO
+    com.myapp.authservice: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  # Don't write to file in Docker (use stdout/stderr)
+  file:
+    name: ""
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p --- [%15.15t] %-40.40logger{39} : %m%n"

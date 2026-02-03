@@ -128,6 +128,7 @@ public class AuthService {
                     .name(userName)
                     .role(Role.USER)
                     .status(UserStatus.ACTIVE)
+                    .isVerified(true) // OTP verified = identity proven
                     .build();
             userRepository.save(user);
 
@@ -138,6 +139,16 @@ public class AuthService {
             user = existingUser.get();
             if (user.getStatus() != UserStatus.ACTIVE) {
                 throw new UnauthorizedException("Account is not active");
+            }
+
+            // Mark as verified if this is the first OTP login for a placeholder user
+            if (!user.isVerified()) {
+                user.setVerified(true);
+                if (name != null && !name.isBlank() && "Guest".equals(user.getName())) {
+                    user.setName(name);
+                }
+                userRepository.save(user);
+                log.info("Placeholder user verified via OTP: {}", user.getId());
             }
         }
 

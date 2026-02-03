@@ -61,6 +61,8 @@ public class SecurityConfig {
                                 "/auth/passkey/login",
                                 "/auth/refresh"
                         ).permitAll()
+                        // Internal service-to-service endpoints
+                        .requestMatchers("/internal/**").permitAll()
                         // Actuator endpoints
                         .requestMatchers("/actuator/**").permitAll()
                         // Swagger/OpenAPI

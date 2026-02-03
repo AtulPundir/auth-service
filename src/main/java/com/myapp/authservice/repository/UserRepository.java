@@ -23,4 +23,16 @@ public interface UserRepository extends JpaRepository<User, String> {
      * Matches: prisma.user.findUnique({ where: { phone } }) != null
      */
     boolean existsByPhone(String phone);
+
+    /**
+     * Find user by email (case-insensitive)
+     */
+    Optional<User> findByEmailIgnoreCase(String email);
+
+    /**
+     * Find user by last N digits of phone number.
+     * Used when identity-service sends phone without country code.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM User u WHERE u.phone LIKE %:suffix")
+    Optional<User> findByPhoneSuffix(@org.springframework.data.repository.query.Param("suffix") String suffix);
 }

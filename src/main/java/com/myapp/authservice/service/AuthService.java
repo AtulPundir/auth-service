@@ -42,6 +42,7 @@ public class AuthService {
     private final OtpUtils otpUtils;
     private final PasswordEncoder passwordEncoder;
     private final RateLimitingService rateLimitingService;
+    private final IdentityServiceClient identityServiceClient;
 
     @Value("${app.jwt.refresh-token-expiry-days}")
     private long refreshTokenExpiryDays;
@@ -57,6 +58,8 @@ public class AuthService {
         rateLimitingService.checkOtpSendLimit(formattedPhone);
 
         String otp = otpUtils.generateOtp();
+        //The OTP log is for local purpose, THIS SHOULD BE REMOVED
+        log.info("OTP Generated: {}", otp);
         LocalDateTime expiresAt = otpUtils.getExpiryDate();
 
         // Save OTP to database
@@ -155,6 +158,9 @@ public class AuthService {
         // Reset rate limit on successful verification
         rateLimitingService.resetOtpVerifyLimit(formattedPhone);
 
+        // Notify identity-service so it can link placeholder users and resolve invitations
+        identityServiceClient.onboardUser(user.getId(), user.getName(), formattedPhone, user.getEmail());
+
         return authResponse;
     }
 
@@ -198,6 +204,9 @@ public class AuthService {
 
         // Reset rate limit on successful login
         rateLimitingService.resetPasskeyLoginLimit(formattedPhone);
+
+        // Notify identity-service so it can link placeholder users and resolve invitations
+        identityServiceClient.onboardUser(user.getId(), user.getName(), formattedPhone, user.getEmail());
 
         return authResponse;
     }
@@ -246,8 +255,10 @@ public class AuthService {
             throw new UnauthorizedException("Account is not active");
         }
 
-        // Delete old refresh token
-        refreshTokenRepository.delete(storedToken);
+        // Delete ALL refresh tokens for this user to prevent race-condition duplicates
+        // when multiple API clients attempt concurrent refreshes
+        refreshTokenRepository.deleteAllByUserId(user.getId());
+        refreshTokenRepository.flush();
 
         // Generate new tokens
         String newAccessToken = jwtUtils.generateAccessToken(user.getId(), user.getPhone(), user.getRole());

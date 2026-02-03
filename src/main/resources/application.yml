@@ -76,6 +76,9 @@ app:
     expiry-minutes: 5
     max-attempts: 3
 
+  identity-service:
+    base-url: ${IDENTITY_SERVICE_URL:http://localhost:3002}
+
   security:
     cors:
       enabled: ${CORS_ENABLED:true}

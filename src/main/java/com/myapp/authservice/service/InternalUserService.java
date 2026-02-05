@@ -135,15 +135,19 @@ public class InternalUserService {
 
         // Phone: ensure E.164 format
         String cleaned = key.replaceAll("[^\\d+]", "");
+
+        // Phone must include country code (start with +)
         if (!cleaned.startsWith("+")) {
-            // If no country code, assume it's already normalized or add +
-            if (cleaned.length() == 10) {
-                // Assume US/Canada format without country code
-                cleaned = "+1" + cleaned;
-            } else {
-                cleaned = "+" + cleaned;
-            }
+            throw new IllegalArgumentException(
+                "Phone number must include country code in E.164 format (e.g., +919876543210)");
         }
+
+        // Validate minimum length: + plus at least 9 digits
+        if (cleaned.length() < 10) {
+            throw new IllegalArgumentException(
+                "Phone number is too short. Must be in E.164 format with country code");
+        }
+
         return cleaned;
     }
 

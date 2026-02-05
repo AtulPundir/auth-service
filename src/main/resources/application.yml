@@ -79,6 +79,10 @@ app:
   identity-service:
     base-url: ${IDENTITY_SERVICE_URL:http://localhost:3002}
 
+  notification-service:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8083}
+    api-key: ${NOTIFICATION_SERVICE_API_KEY:internal-service-key-change-in-production}
+
   security:
     cors:
       enabled: ${CORS_ENABLED:true}

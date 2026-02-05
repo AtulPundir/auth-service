@@ -122,4 +122,13 @@ public class OtpUtils {
     public long getExpirySeconds() {
         return expiryMinutes * 60L;
     }
+
+    /**
+     * Get expiry time in minutes.
+     *
+     * @return Expiry minutes
+     */
+    public int getExpiryMinutes() {
+        return expiryMinutes;
+    }
 }

@@ -43,12 +43,13 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final RateLimitingService rateLimitingService;
     private final IdentityServiceClient identityServiceClient;
+    private final NotificationServiceClient notificationServiceClient;
 
     @Value("${app.jwt.refresh-token-expiry-days}")
     private long refreshTokenExpiryDays;
 
     /**
-     * Send OTP to phone number
+     * Send OTP to phone number.
      */
     @Transactional
     public OtpSentResponse sendOtp(String phone, String ipAddress, String userAgent) {
@@ -58,9 +59,8 @@ public class AuthService {
         rateLimitingService.checkOtpSendLimit(formattedPhone);
 
         String otp = otpUtils.generateOtp();
-        //The OTP log is for local purpose, THIS SHOULD BE REMOVED
-        log.info("OTP Generated: {}", otp);
         LocalDateTime expiresAt = otpUtils.getExpiryDate();
+        int ttlMinutes = (int) otpUtils.getExpiryMinutes();
 
         // Save OTP to database
         OtpCode otpCode = OtpCode.builder()
@@ -71,12 +71,53 @@ public class AuthService {
                 .build();
         otpCodeRepository.save(otpCode);
 
+        // Send OTP via SMS (fire-and-forget, non-blocking)
+        notificationServiceClient.sendOtpSms(formattedPhone, otp, ttlMinutes);
+
         // Audit log (never log the OTP code itself)
         createAuditLog(null, AuditAction.OTP_SENT, formattedPhone, ipAddress, userAgent,
-                Map.of("expiresAt", expiresAt.toString()), true);
+                Map.of("expiresAt", expiresAt.toString(), "channel", "SMS"), true);
 
-        // Log only masked phone, never the OTP code (security best practice)
-        log.info("OTP sent to phone: {}", maskPhone(formattedPhone));
+        log.info("OTP sent via SMS to: {}", maskPhone(formattedPhone));
+
+        return OtpSentResponse.builder()
+                .message("OTP sent successfully")
+                .expiresIn((int) otpUtils.getExpirySeconds())
+                .build();
+    }
+
+    /**
+     * Send OTP to email address.
+     */
+    @Transactional
+    public OtpSentResponse sendOtpToEmail(String email, String ipAddress, String userAgent) {
+        String normalizedEmail = email.toLowerCase().trim();
+
+        // Check rate limit (per email)
+        rateLimitingService.checkOtpSendLimit(normalizedEmail);
+
+        String otp = otpUtils.generateOtp();
+        LocalDateTime expiresAt = otpUtils.getExpiryDate();
+        int ttlMinutes = (int) otpUtils.getExpiryMinutes();
+
+        // Save OTP to database (using phone field for email temporarily, or add email field)
+        // For now, we store email in the phone field since it's the identifier
+        OtpCode otpCode = OtpCode.builder()
+                .id(CuidGenerator.generate())
+                .phone(normalizedEmail) // Using phone field as identifier
+                .code(otp)
+                .expiresAt(expiresAt)
+                .build();
+        otpCodeRepository.save(otpCode);
+
+        // Send OTP via Email (fire-and-forget, non-blocking)
+        notificationServiceClient.sendOtpEmail(normalizedEmail, otp, ttlMinutes);
+
+        // Audit log (never log the OTP code itself)
+        createAuditLog(null, AuditAction.OTP_SENT, normalizedEmail, ipAddress, userAgent,
+                Map.of("expiresAt", expiresAt.toString(), "channel", "EMAIL"), true);
+
+        log.info("OTP sent via Email to: {}", maskEmail(normalizedEmail));
 
         return OtpSentResponse.builder()
                 .message("OTP sent successfully")
@@ -442,5 +483,25 @@ public class AuthService {
         String prefix = phone.substring(0, Math.min(3, len));
         String suffix = phone.substring(len - 4);
         return prefix + "****" + suffix;
+    }
+
+    /**
+     * Mask email for logging (security best practice)
+     * Example: john.doe@example.com -> joh***@example.com
+     */
+    private String maskEmail(String email) {
+        if (email == null || email.length() < 5) {
+            return "****";
+        }
+        int atIndex = email.indexOf("@");
+        if (atIndex < 1) {
+            return "****";
+        }
+        String local = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+        String maskedLocal = local.length() <= 3
+                ? local.charAt(0) + "***"
+                : local.substring(0, 3) + "***";
+        return maskedLocal + domain;
     }
 }

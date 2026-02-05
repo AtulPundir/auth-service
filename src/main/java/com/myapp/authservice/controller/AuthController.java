@@ -21,7 +21,8 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * Send OTP to phone number
+     * Send OTP to phone number or email.
+     * At least one of phone or email must be provided. Phone takes priority.
      * POST /auth/otp/send
      */
     @PostMapping("/otp/send")
@@ -29,13 +30,25 @@ public class AuthController {
             @Valid @RequestBody SendOtpRequest request,
             HttpServletRequest httpRequest) {
 
-        log.info("POST /auth/otp/send - Request: phone={}", maskPhone(request.getPhone()));
+        // Validate at least one identifier is provided
+        if (!request.hasAnyIdentifier()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Either phone or email is required"));
+        }
 
         String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
 
-        OtpSentResponse response = authService.sendOtp(
-                request.getPhone(), ipAddress, userAgent);
+        OtpSentResponse response;
+
+        // Phone takes priority if both provided
+        if (request.hasPhone()) {
+            log.info("POST /auth/otp/send - Request: phone={}", maskPhone(request.getPhone()));
+            response = authService.sendOtp(request.getPhone(), ipAddress, userAgent);
+        } else {
+            log.info("POST /auth/otp/send - Request: email={}", maskEmail(request.getEmail()));
+            response = authService.sendOtpToEmail(request.getEmail(), ipAddress, userAgent);
+        }
 
         log.info("POST /auth/otp/send - Response: success=true, expiresIn={}", response.getExpiresIn());
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -226,5 +239,24 @@ public class AuthController {
             return "****";
         }
         return phone.substring(0, 5) + "****" + phone.substring(phone.length() - 2);
+    }
+
+    /**
+     * Mask email for logging (show first 3 chars of local part + domain)
+     */
+    private String maskEmail(String email) {
+        if (email == null || email.length() < 5) {
+            return "****";
+        }
+        int atIndex = email.indexOf("@");
+        if (atIndex < 1) {
+            return "****";
+        }
+        String local = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+        String maskedLocal = local.length() <= 3
+                ? local.charAt(0) + "***"
+                : local.substring(0, 3) + "***";
+        return maskedLocal + domain;
     }
 }
